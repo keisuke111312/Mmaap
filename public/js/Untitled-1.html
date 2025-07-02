@@ -1,0 +1,408 @@
+   <script>
+        // Global variables to maintain state
+        const discussions = []
+        const currentUser = {
+            id: 1,
+            username: "current_user",
+            avatar: "https://i.pravatar.cc/40?img=5",
+        }
+
+        // Initialize the application
+        document.addEventListener("DOMContentLoaded", () => {
+            initializeEventListeners()
+            loadDiscussions()
+        })
+
+        // Toggle comments visibility
+        function toggleComments(discussionId) {
+            const commentSection = document.getElementById(`comments-${discussionId}`)
+            if (commentSection) {
+                commentSection.classList.toggle("hidden")
+
+                // Update button text
+                const button = document.querySelector(`[onclick="toggleComments(${discussionId})"]`)
+                if (button) {
+                    const isHidden = commentSection.classList.contains("hidden")
+                    const commentCount = commentSection.querySelectorAll(".comment").length
+                    button.innerHTML = `<i class="far fa-comment"></i> <span>${commentCount} Comments</span>`
+                }
+            }
+        }
+
+        // Toggle reply form
+        function toggleReplyForm(button) {
+            const comment = button.closest(".comment")
+            const replyForm = comment.querySelector(".reply-form")
+            if (replyForm) {
+                replyForm.classList.toggle("hidden")
+
+                // Focus on textarea when showing
+                if (!replyForm.classList.contains("hidden")) {
+                    const textarea = replyForm.querySelector(".reply-input")
+                    if (textarea) {
+                        textarea.focus()
+                    }
+                }
+            }
+        }
+
+        // Modal functions
+
+function openEventModal() {
+    const modal = document.getElementById('eventModalOverlay');
+    modal.classList.remove('hidden');
+    modal.classList.add('active');
+}
+
+function closeEventModal() {
+    const modal = document.getElementById('eventModalOverlay');
+    modal.classList.remove('active');
+    modal.classList.add('hidden');
+}
+
+
+
+        // File upload functions
+        function triggerFileInput() {
+            const fileInput = document.getElementById("image_path")
+            if (fileInput) {
+                fileInput.click()
+            }
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0]
+            const preview = document.getElementById("file-preview")
+            const fileName = preview.querySelector(".file-name")
+
+            if (file) {
+                // Validate file size (5MB limit)
+                if (file.size > 5 * 1024 * 1024) {
+                    alert("File size must be less than 5MB")
+                    event.target.value = ""
+                    return
+                }
+
+                // Validate file type
+                if (!file.type.startsWith("image/")) {
+                    alert("Please select an image file")
+                    event.target.value = ""
+                    return
+                }
+
+                fileName.textContent = file.name
+                preview.classList.remove("hidden")
+            } else {
+                preview.classList.add("hidden")
+            }
+        }
+
+        function removeFile() {
+            const fileInput = document.getElementById("image_path")
+            const preview = document.getElementById("file-preview")
+
+            if (fileInput) {
+                fileInput.value = ""
+            }
+            if (preview) {
+                preview.classList.add("hidden")
+            }
+        }
+
+        // Form submission handlers
+        function handleDiscussionSubmit(event) {
+            event.preventDefault()
+
+            const formData = new FormData(event.target)
+            const discussionData = {
+                id: Date.now(),
+                title: formData.get("title"),
+                category: formData.get("category"),
+                body: formData.get("body"),
+                image: formData.get("image_path"),
+                author: currentUser,
+                timestamp: new Date(),
+                likes: 0,
+                comments: [],
+            }
+
+            // Validate required fields
+            if (!discussionData.title || !discussionData.category || !discussionData.body) {
+                alert("Please fill in all required fields")
+                return
+            }
+
+            // Add to discussions array
+            discussions.unshift(discussionData)
+
+            // Create and insert new discussion element
+            createDiscussionElement(discussionData)
+
+            // Close modal and reset form
+            closeEventModal()
+
+            // Show success message
+            showNotification("Discussion created successfully!", "success")
+        }
+
+        function handleCommentSubmit(event) {
+            event.preventDefault()
+
+            const commentForm = event.target.closest(".comment-form")
+            const textarea = commentForm.querySelector(".comment-input")
+            const discussionCard = commentForm.closest(".discussion-card")
+            const discussionId = discussionCard.dataset.discussionId
+
+            if (!textarea.value.trim()) {
+                alert("Please enter a comment")
+                return
+            }
+
+            const commentData = {
+                id: Date.now(),
+                body: textarea.value.trim(),
+                author: currentUser,
+                timestamp: new Date(),
+                likes: 0,
+                replies: [],
+            }
+
+            // Add comment to discussion
+            const discussion = discussions.find((d) => d.id == discussionId)
+            if (discussion) {
+                discussion.comments.push(commentData)
+            }
+
+            // Create and insert comment element
+            const commentsList = commentForm.nextElementSibling
+            const commentElement = createCommentElement(commentData)
+            commentsList.appendChild(commentElement)
+
+            // Clear textarea
+            textarea.value = ""
+            autoResizeTextarea(textarea)
+
+            // Update comment count
+            updateCommentCount(discussionId)
+
+            showNotification("Comment posted!", "success")
+        }
+
+        function handleReplySubmit(event) {
+            event.preventDefault()
+
+            const replyForm = event.target.closest(".reply-form")
+            const textarea = replyForm.querySelector(".reply-input")
+            const comment = replyForm.closest(".comment")
+
+            if (!textarea.value.trim()) {
+                alert("Please enter a reply")
+                return
+            }
+
+            const replyData = {
+                id: Date.now(),
+                body: textarea.value.trim(),
+                author: currentUser,
+                timestamp: new Date(),
+                likes: 0,
+            }
+
+            // Create and insert reply element
+            const replyElement = createReplyElement(replyData)
+            comment.parentNode.insertBefore(replyElement, comment.nextSibling)
+
+            // Clear textarea and hide form
+            textarea.value = ""
+            replyForm.classList.add("hidden")
+
+            showNotification("Reply posted!", "success")
+        }
+
+        // Like functionality
+        function handleLikeClick(event) {
+            event.preventDefault()
+
+            const likeBtn = event.target.closest(".like-btn") || event.target
+            const likeCount = likeBtn.querySelector("span")
+            const icon = likeBtn.querySelector("i")
+
+            // Toggle like state
+            const isLiked = likeBtn.classList.contains("active")
+
+            if (isLiked) {
+                likeBtn.classList.remove("active")
+                icon.classList.remove("fas")
+                icon.classList.add("far")
+                likeCount.textContent = Number.parseInt(likeCount.textContent) - 1
+            } else {
+                likeBtn.classList.add("active")
+                icon.classList.remove("far")
+                icon.classList.add("fas")
+                likeCount.textContent = Number.parseInt(likeCount.textContent) + 1
+
+                // Add animation
+                likeBtn.style.transform = "scale(1.1)"
+                setTimeout(() => {
+                    likeBtn.style.transform = ""
+                }, 150)
+            }
+        }
+
+        // Create discussion element
+
+
+        // Create comment element
+        function createCommentElement(comment) {
+            const commentElement = document.createElement("div")
+            commentElement.className = "comment"
+
+            commentElement.innerHTML = `
+        <img src="${comment.author.avatar}" alt="User Avatar" class="comment-avatar">
+        <div class="comment-content">
+            <div class="comment-header">
+                <strong class="comment-author">${comment.author.username}</strong>
+                <span class="comment-time">Just now</span>
+            </div>
+            <p class="comment-text">${comment.body}</p>
+            <div class="comment-actions">
+                <button class="comment-action-btn">
+                    <i class="far fa-heart"></i> 0
+                </button>
+                <button class="comment-action-btn reply-btn" onclick="toggleReplyForm(this)">
+                    <i class="far fa-reply"></i> Reply
+                </button>
+            </div>
+            
+            <div class="reply-form hidden">
+                <img src="${currentUser.avatar}" alt="Your Avatar" class="reply-avatar">
+                <div class="reply-input-wrapper">
+                    <textarea placeholder="Write a reply..." class="reply-input"></textarea>
+                    <button class="reply-submit-btn">Reply</button>
+                </div>
+            </div>
+        </div>
+    `
+
+            return commentElement
+        }
+
+        // Create reply element
+        function createReplyElement(reply) {
+            const replyElement = document.createElement("div")
+            replyElement.className = "comment reply"
+
+            replyElement.innerHTML = `
+        <img src="${reply.author.avatar}" alt="User Avatar" class="comment-avatar">
+        <div class="comment-content">
+            <div class="comment-header">
+                <strong class="comment-author">${reply.author.username}</strong>
+                <span class="comment-time">Just now</span>
+            </div>
+            <p class="comment-text">${reply.body}</p>
+            <div class="comment-actions">
+                <button class="comment-action-btn">
+                    <i class="far fa-heart"></i> 0
+                </button>
+            </div>
+        </div>
+    `
+
+            return replyElement
+        }
+
+        // Auto-resize textarea
+        function autoResizeTextarea(textarea) {
+            textarea.style.height = "auto"
+            textarea.style.height = textarea.scrollHeight + "px"
+        }
+
+        // Update comment count
+        function updateCommentCount(discussionId) {
+            const commentBtn = document.querySelector(`[onclick="toggleComments(${discussionId})"]`)
+            const commentsSection = document.getElementById(`comments-${discussionId}`)
+            const commentCount = commentsSection.querySelectorAll(".comment").length
+
+            if (commentBtn) {
+                commentBtn.innerHTML = `<i class="far fa-comment"></i> <span>${commentCount} Comments</span>`
+            }
+        }
+
+        // Show notification
+        function showNotification(message, type = "info") {
+            // Create notification element
+            const notification = document.createElement("div")
+            notification.className = `notification notification-${type}`
+            notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 1rem 1.5rem;
+        background: ${type === "success" ? "#10b981" : "#3b82f6"};
+        color: white;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25);
+        z-index: 1001;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        font-weight: 600;
+    `
+            notification.textContent = message
+
+            document.body.appendChild(notification)
+
+            // Animate in
+            setTimeout(() => {
+                notification.style.transform = "translateX(0)"
+            }, 100)
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.style.transform = "translateX(100%)"
+                setTimeout(() => {
+                    document.body.removeChild(notification)
+                }, 300)
+            }, 3000)
+        }
+
+        // Load initial discussions (placeholder function)
+        function loadDiscussions() {
+            // This would typically load from a server
+            // For now, discussions are already in the HTML
+            console.log("Discussions loaded")
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener("keydown", (e) => {
+            // Escape key closes modal
+            if (e.key === "Escape") {
+                closeEventModal()
+            }
+
+            // Ctrl/Cmd + Enter submits forms
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                const activeElement = document.activeElement
+                if (activeElement.classList.contains("comment-input")) {
+                    const submitBtn = activeElement.parentNode.querySelector(".comment-submit-btn")
+                    if (submitBtn) submitBtn.click()
+                } else if (activeElement.classList.contains("reply-input")) {
+                    const submitBtn = activeElement.parentNode.querySelector(".reply-submit-btn")
+                    if (submitBtn) submitBtn.click()
+                }
+            }
+        })
+
+        // Smooth scrolling for anchor links
+        document.addEventListener("click", (e) => {
+            if (e.target.tagName === "A" && e.target.getAttribute("href").startsWith("#")) {
+                e.preventDefault()
+                const target = document.querySelector(e.target.getAttribute("href"))
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: "smooth"
+                    })
+                }
+            }
+        })
+    </script>
+
