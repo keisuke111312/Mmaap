@@ -24,18 +24,19 @@ WORKDIR /var/www
 # Copy app files
 COPY . .
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader
+# Install PHP dependencies (remove --no-dev temporarily to allow debug routes)
+RUN composer install --optimize-autoloader
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
-# Laravel-specific commands
-RUN php artisan config:cache
-RUN php artisan route:cache
+# 🧹 Clear and recache config only — skip route caching to allow hot reload
+RUN php artisan config:clear \
+ && php artisan view:clear \
+ && php artisan config:cache
 
 # Expose port
 EXPOSE 8000
 
-# Run Laravel's dev server
+# Start Laravel dev server
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
