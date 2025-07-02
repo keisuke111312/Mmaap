@@ -5,7 +5,7 @@ pkgs.mkShell {
     pkgs.php82
     pkgs.composer
     pkgs.nodejs_20
-    pkgs.mysql
     pkgs.git
+    pkgs.mysql
   ];
 }
