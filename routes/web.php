@@ -37,6 +37,12 @@ Route::get('/', function () {
 })->name('welcome');
 
 
+Route::get('/debug', function () {
+    logger('Debug route hit!');
+    return 'Debug route worked!';
+});
+
+
 // Route::get('/about', function () {
 //     return view('pages.about');
 // }); 
